@@ -4,6 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from fractions import Fraction
 import sympy as sp
+import os
 
 
 # =========================
@@ -410,7 +411,24 @@ def read_matrix(domain):
         if not line:
             break
 
-        vals = [domain.parse_scalar(x) for x in line.split()]
+        try:
+            vals = [domain.parse_scalar(x) for x in line.split()]
+
+            # check that only allowed parameters appear
+            if domain.is_parametric:
+                allowed = set(domain.parameters.values())
+
+                for v in vals:
+                    if hasattr(v, "free_symbols"):
+                        bad = v.free_symbols - allowed
+                        if bad:
+                            bad_names = ", ".join(str(s) for s in bad)
+                            raise DomainError(f"Unknown parameter(s): {bad_names}")
+
+        except Exception as e:
+            print(f"Invalid row: {e}")
+            print("Please re-enter the row.")
+            continue
 
         if width is None:
             width = len(vals)
@@ -560,6 +578,7 @@ def main():
 
             elif op == "clr":
                 clear_screen()
+                m.display()
 
             else:
                 print("Unknown command. Type 'help' for usage.")

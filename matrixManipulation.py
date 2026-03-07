@@ -215,6 +215,8 @@ class MatrixManipulator:
             s_str = "-"
         else:
             s_str = s_val
+        if " " in s_str or s_str.startswith("-") and not s_str.startswith("-("):
+            s_str = f"({s_str})"
 
         self.log.append(f"R{i} -> {s_str}R{i}")
 
@@ -295,6 +297,23 @@ class MatrixManipulator:
                 left = "  ".join(r[c].rjust(w[c]) for c in range(cols - 1))
                 right = r[cols - 1].rjust(w[cols - 1])
                 print(f"[ {left} | {right} ]")
+                
+    def reset(self):
+        self.push()
+        self.matrix = deepcopy(self.original)
+        self.log.append("Reset to original matrix")
+    
+    def print_log(self, limit=5):
+        if not self.log:
+            print("(none)")
+        else:
+            if limit is None or len(self.log) <= limit:
+                for i, op in enumerate(self.log, 1):
+                    print(f"{i}. {op}")
+            else:
+                start = max(0, len(self.log) - limit)
+                for i, op in enumerate(self.log[start:], start + 1):
+                    print(f"{i}. {op}")
 
     def display(self):
         print("\n================================================")
@@ -311,12 +330,7 @@ class MatrixManipulator:
         self.print_matrix(self.matrix)
 
         print("\nOperations")
-        if not self.log:
-            print("(none)")
-        else:
-            start = max(0, len(self.log) - 5)
-            for i, op in enumerate(self.log[start:], start + 1):
-                print(f"{i}. {op}")
+        self.print_log(limit=5)
 
         print("================================================\n")
 
@@ -452,6 +466,9 @@ def parse_add_sub(command, parts, domain):
 # Main CLI
 # =========================
 
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 def print_help():
     print("Commands:")
     print("  show                              - Display the current matrix and log")
@@ -461,6 +478,9 @@ def print_help():
     print("  sub i j [-iScale s] [-jScale t]   - R_i -> sR_i - tR_j")
     print("  undo                              - Undo the last operation")
     print("  redo                              - Redo the last undone operation")
+    print("  log                               - Show the full operation log")
+    print("  reset                             - Reset to the original matrix")
+    print("  clr                               - Clear the screen")
     print("  help                              - Show this help")
     print("  quit                              - Exit the program")
 
@@ -530,6 +550,16 @@ def main():
             elif op == "redo":
                 m.redo()
                 m.display()
+
+            elif op == "log":
+                m.print_log()
+
+            elif op == "reset":
+                m.reset()
+                m.display()
+
+            elif op == "clr":
+                clear_screen()
 
             else:
                 print("Unknown command. Type 'help' for usage.")

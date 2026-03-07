@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 import sympy as sp
 import os
+import re
 
 
 # =========================
@@ -215,9 +216,20 @@ class MatrixManipulator:
         elif s_val == "-1":
             s_str = "-"
         else:
-            s_str = s_val
-        if " " in s_str or s_str.startswith("-") and not s_str.startswith("-("):
-            s_str = f"({s_str})"
+            if self.domain.is_parametric:
+                expr = sp.sympify(s)
+
+                # if it contains parameters OR is not a simple integer
+                if expr.free_symbols or not expr.is_integer:
+                    s_str = f"({s_val})"
+                else:
+                    s_str = s_val
+            else:
+                # non-parametric mode
+                if "/" in s_val or any(c.isalpha() for c in s_val):
+                    s_str = f"({s_val})"
+                else:
+                    s_str = s_val
 
         self.log.append(f"R{i} -> {s_str}R{i}")
 
@@ -243,16 +255,94 @@ class MatrixManipulator:
 
     def linear_row_add(self, i, j, s, t):
         self.linear_row_op(i, j, s, t)
-        s_str = f"{self._fmt_scalar(s)}R{i}" if not self._is_one(s) else f"R{i}"
-        t_str = f"{self._fmt_scalar(t)}R{j}" if not self._is_one(t) else f"R{j}"
-        self.log.append(f"R{i} -> {s_str} + {t_str}")
+        s_val = self._fmt_scalar(s)
+        if self._is_one(s):
+            s_str = ""
+        elif s_val == "-1":
+            s_str = "-"
+        else:
+            if self.domain.is_parametric:
+                expr = sp.sympify(s)
+
+                # if it contains parameters OR is not a simple integer
+                if expr.free_symbols or not expr.is_integer:
+                    s_str = f"({s_val})"
+                else:
+                    s_str = s_val
+            else:
+                # non-parametric mode
+                if "/" in s_val or any(c.isalpha() for c in s_val):
+                    s_str = f"({s_val})"
+                else:
+                    s_str = s_val
+        t_val = self._fmt_scalar(t)
+
+        if self._is_one(t):
+            t_str = ""
+        elif t_val == "-1":
+            t_str = "-"
+        else:
+            if self.domain.is_parametric:
+                expr = sp.sympify(t)
+
+                # if it contains parameters OR is not a simple integer
+                if expr.free_symbols or not expr.is_integer:
+                    t_str = f"({t_val})"
+                else:
+                    t_str = t_val
+            else:
+                # non-parametric mode
+                if "/" in t_val or any(c.isalpha() for c in t_val):
+                    t_str = f"({t_val})"
+                else:
+                    t_str = t_val
+        self.log.append(f"R{i} -> {s_str}R{i} + {t_str}R{j}")
 
     def linear_row_sub(self, i, j, s, t):
         self.linear_row_op(i, j, s, self.domain.neg(t))
-        s_str = f"{self._fmt_scalar(s)}R{i}" if not self._is_one(s) else f"R{i}"
-        t_str = f"{self._fmt_scalar(t)}R{j}" if not self._is_one(t) else f"R{j}"
-        self.log.append(f"R{i} -> {s_str} - {t_str}")
+        s_val = self._fmt_scalar(s)
+        if self._is_one(s):
+            s_str = ""
+        elif s_val == "-1":
+            s_str = "-"
+        else:
+            if self.domain.is_parametric:
+                expr = sp.sympify(s)
 
+                # if it contains parameters OR is not a simple integer
+                if expr.free_symbols or not expr.is_integer:
+                    s_str = f"({s_val})"
+                else:
+                    s_str = s_val
+            else:
+                # non-parametric mode
+                if "/" in s_val or any(c.isalpha() for c in s_val):
+                    s_str = f"({s_val})"
+                else:
+                    s_str = s_val
+        t_val = self._fmt_scalar(t)
+
+        if self._is_one(t):
+            t_str = ""
+        elif t_val == "-1":
+            t_str = "-"
+        else:
+            if self.domain.is_parametric:
+                expr = sp.sympify(t)
+
+                # if it contains parameters OR is not a simple integer
+                if expr.free_symbols or not expr.is_integer:
+                    t_str = f"({t_val})"
+                else:
+                    t_str = t_val
+            else:
+                # non-parametric mode
+                if "/" in t_val or any(c.isalpha() for c in t_val):
+                    t_str = f"({t_val})"
+                else:
+                    t_str = t_val
+        self.log.append(f"R{i} -> {s_str}R{i} - {t_str}R{j}")
+        
     def _is_one(self, x):
         if self.domain.is_parametric:
             return sp.simplify(x - 1) == 0
@@ -317,15 +407,28 @@ class MatrixManipulator:
                     print(f"{i}. {op}")
 
     def display(self):
-        print("\n================================================")
-        print("Domain:", self.domain.describe())
+        print("================================================")
+        print("Domain:", self.domain.describe(), end="")
 
         if self.domain.is_parametric:
             params = " ".join(self.domain.parameters.keys())
-            print("Parameters:", params if params else "(none)")
+            print(", Parameters:", params if params else "(none)")
+        else:
+            print()
 
         print("\nOriginal matrix")
         self.print_matrix(self.original)
+
+        print("\nCurrent matrix")
+        self.print_matrix(self.matrix)
+
+        print("\nOperations")
+        self.print_log(limit=5)
+
+        print("================================================\n")
+    
+    def display_state(self):
+        print("================================================")
 
         print("\nCurrent matrix")
         self.print_matrix(self.matrix)
@@ -543,38 +646,38 @@ def main():
                 i = int(cmd[1])
                 j = int(cmd[2])
                 m.swap(i, j)
-                m.display()
+                m.display_state()
 
             elif op == "scale":
                 i = int(cmd[1])
                 s = domain.parse_scalar(cmd[2])
                 m.linear_row_scale(i, s)
-                m.display()
+                m.display_state()
 
             elif op == "add":
                 i, j, s, t = parse_add_sub(op, cmd, domain)
                 m.linear_row_add(i, j, s, t)
-                m.display()
+                m.display_state()
 
             elif op == "sub":
                 i, j, s, t = parse_add_sub(op, cmd, domain)
                 m.linear_row_sub(i, j, s, t)
-                m.display()
+                m.display_state()
 
             elif op == "undo":
                 m.undo()
-                m.display()
+                m.display_state()
 
             elif op == "redo":
                 m.redo()
-                m.display()
+                m.display_state()
 
             elif op == "log":
                 m.print_log()
 
             elif op == "reset":
                 m.reset()
-                m.display()
+                m.display_state()
 
             elif op == "clr":
                 clear_screen()

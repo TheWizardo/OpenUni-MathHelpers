@@ -161,6 +161,7 @@
       font-size: 0.82rem;
       line-height: 1.4;
       margin-top: 0.45rem;
+      width: fit-content;
     }
 
     .workspace {
@@ -258,6 +259,10 @@
       background: #fafafa;
     }
 
+    sub, sup {
+      font-size: calc(var(--code-size) / 1.5);
+    }
+
     @media print {
       body {
         background: #fff;
@@ -296,12 +301,15 @@
         <label for="codeInput">Pseudo-code source</label>
         <textarea id="codeInput" spellcheck="false">for j <- 2 to length[A]
     do key <- A[j]
-    ▷ Insert A[j] into the sorted sequence A[1..j-1].
-    i <- j - 1
-    while i > 0 and A[i] > key
-        do A[i + 1] <- A[i]
-        i <- i - 1
-    A[i + 1] <- key</textarea>
+    ▷ This PseudoCode is gibberish and just here to show you the editor's capabilities. It doesn't have to make sense!
+    i <- floor((j - 1)/2)
+    A[1] <- -\infty
+    while i >= 0 and A[i] > key
+        do A[i^2 + 1] <- A[i]
+        i <- i*j - a_key
+    A[i + 1] <-> key
+  elseif A[i^j +1] > \infty
+    return error "impossible"</textarea>
 
         <div class="hint">
           One logical line per editor line. No wrapping; scroll horizontally and vertically as needed.
@@ -358,9 +366,17 @@
               <input id="autoSubscripts" type="checkbox" checked />
               <span>Auto-subscript trailing digits after letters</span>
             </label>
+          </div>
 
+          <div class="row">
             <div class="hint">
-              Keywords: while, for, do, to, downto, then, else, return, and, or
+              Keywords: while, for, do, to, downto, then, else, return, and, or, error, until, repeat
+            </div>
+            <div class="hint">
+              Special signs: use &lt;-, &lt;=, &gt;=, !=, \infty, n2, n_2
+            </div>
+            <div class="hint">
+              Comments: use &gt;, ▷, or // at the start of a line (after indentation)
             </div>
           </div>
         </div>
@@ -394,7 +410,7 @@
   </div>
 
   <script>
-    const KEYWORDS = new Set(["while", "for", "do", "to", "downto", "then", "else", "return", "and", "or"]);
+    const KEYWORDS = new Set(["elseif", "while", "for", "do", "to", "downto", "then", "else", "return", "and", "or", "error", "until", "repeat"]);
 
     const els = {
       procName: document.getElementById("procName"),
@@ -420,19 +436,74 @@
       return s
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/\*/g, "⋅");
     }
 
     function setStatus(msg) {
       els.status.textContent = msg;
     }
 
+    function replaceBalancedFunction(text, fnName, openSym, closeSym) {
+      let result = "";
+      let i = 0;
+
+      while (i < text.length) {
+        if (text.startsWith(fnName + "(", i)) {
+          const start = i + fnName.length;
+          let j = start;
+          let depth = 0;
+          let found = false;
+
+          while (j < text.length) {
+            const ch = text[j];
+            if (ch === "(") {
+              depth++;
+            } else if (ch === ")") {
+              depth--;
+              if (depth === 0) {
+                found = true;
+                break;
+              }
+            }
+            j++;
+          }
+
+          if (found) {
+            const inner = text.slice(start + 1, j);
+            const replacedInner = replaceBalancedFunction(
+              replaceBalancedFunction(inner, "floor", "⌊", "⌋"),
+              "ceil",
+              "⌈",
+              "⌉"
+            );
+            result += openSym + replacedInner + closeSym;
+            i = j + 1;
+            continue;
+          }
+        }
+
+        result += text[i];
+        i++;
+      }
+
+      return result;
+    }
+
     function applyLigatures(text) {
-      return text
+      let out = text
+        .replace(/\\infty/g, "∞");
+
+      out = replaceBalancedFunction(out, "floor", "⌊", "⌋");
+      out = replaceBalancedFunction(out, "ceil", "⌈", "⌉");
+
+      return out
+        .replace(/<->/g, "↔")
         .replace(/<-/g, "←")
         .replace(/<=/g, "≤")
         .replace(/>=/g, "≥")
-        .replace(/!=/g, "≠");
+        .replace(/!=/g, "≠")
+        .replace(/\*/g, "⋅");
     }
 
     function normalizeCommentLine(raw) {
@@ -461,9 +532,19 @@
       let out = escapeHtml(token);
 
       if (autoSubscripts) {
-        out = out.replace(/([A-Za-z\u00C0-\u024F\u0370-\u03FF])(\d+)\b/g, (_, a, b) => {
-          return `${a}<sub>${b}</sub>`;
-        });
+        out = out
+          .replace(/([A-Za-z\u00C0-\u024F\u0370-\u03FF])_([A-Za-z0-9]+)\^([A-Za-z0-9]+)\b/g, (_, a, sub, sup) => {
+            return `${a}<sub>${sub}</sub><sup>${sup}</sup>`;
+          })
+          .replace(/([A-Za-z\u00C0-\u024F\u0370-\u03FF])_([A-Za-z0-9]+)\b/g, (_, a, b) => {
+            return `${a}<sub>${b}</sub>`;
+          })
+          .replace(/([A-Za-z\u00C0-\u024F\u0370-\u03FF])\^([A-Za-z0-9]+)\b/g, (_, a, b) => {
+            return `${a}<sup>${b}</sup>`;
+          })
+          .replace(/([A-Za-z\u00C0-\u024F\u0370-\u03FF])(\d+)\b/g, (_, a, b) => {
+            return `${a}<sub>${b}</sub>`;
+          });
       }
 
       const lower = token.toLowerCase();

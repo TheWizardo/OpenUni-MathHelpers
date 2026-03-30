@@ -19,11 +19,11 @@ class DomainError(Exception):
 class Domain:
 
     def __init__(self, name, modulus=None, is_parametric=False, parameters=None):
-        self.name = name
-        self.modulus = modulus
-        self.is_parametric = is_parametric
-        self.parameters = parameters or {}
-        self.locals = dict(self.parameters)
+        self.name: str = name
+        self.modulus: int | None = modulus
+        self.is_parametric: bool = is_parametric
+        self.parameters: dict = parameters or {}
+        self.locals: dict = dict(self.parameters)
 
     @staticmethod
     def parse(domain_str, is_parametric=False, parameters=None):
@@ -74,7 +74,7 @@ class Domain:
 
         raise ValueError("Unsupported domain")
 
-    def normalize(self, value):
+    def normalize(self, value) -> int | float | Fraction | sp.Expr:
         if self.is_parametric:
             expr = sp.simplify(value)
 
@@ -133,6 +133,8 @@ class Domain:
             return value
 
         if self.name == "Z_n":
+            if self.modulus is None:
+                raise ValueError("Modulus must be set for Z_n domain")
             return int(value) % self.modulus
 
         raise ValueError("Unsupported domain")
@@ -394,7 +396,7 @@ class MatrixManipulator:
         self.matrix = deepcopy(self.original)
         self.log.append("Reset to original matrix")
     
-    def print_log(self, limit=5):
+    def print_log(self, limit=None):
         if not self.log:
             print("(none)")
         else:

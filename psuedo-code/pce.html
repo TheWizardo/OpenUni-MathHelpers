@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>PseudoCode Editor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #f4f4f4;
+      --panel: #ffffff;
+      --ink: #111111;
+      --muted: #666666;
+      --border: #d0d0d0;
+      --accent: #2d5be3;
+      --gutter-width: 4.8rem;
+      --code-font: "Cambria Math", Cambria, "Times New Roman", serif;
+      --line-height: 1.5;
+      --indent-width: 4ch;
+      --code-size: 22px;
+      --gutter-gap: 2ch;
+      /* requested: 2 spaces between line numbers and code */
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    .app {
+      display: block;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      overflow: visible;
+    }
+
+    .sidebar h1 {
+      font-size: 1.2rem;
+      margin: 0 0 0.6rem 0;
+    }
+
+    .settings-strip {
+      display: flex;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .settings-strip {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .group {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.65rem 0.8rem;
+      margin-bottom: 0.6rem;
+      background: #fff;
+      flex-grow: 1;
+    }
+
+    .settings-group {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.65rem 0.8rem;
+      margin-bottom: 0.6rem;
+      background: #fff;
+      gap: 1ch;
+    }
+
+    .settings-group .row {
+      min-width: 50%;
+      gap: 1.2rem;
+    }
+
+    .group h2,
+    .settings-group h2 {
+      margin: 0 0 0.75rem 0;
+      font-size: 0.95rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      margin: 0.5rem 0 0.25rem;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+      background: #fff;
+      color: #111;
+    }
+
+    textarea {
+      min-height: 55vh;
+      height: 55vh;
+      resize: none;
+      overflow: auto;
+      white-space: pre;
+      word-wrap: normal;
+      overflow-wrap: normal;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.6rem;
+    }
+
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 0.6rem;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: #111;
+      padding: 0.65rem 0.85rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      margin: 0.25rem 0.25rem 0 0;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    button:hover {
+      filter: brightness(0.98);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.4;
+      margin-top: 0.45rem;
+    }
+
+    .workspace {
+      padding: 1rem;
+      overflow: auto;
+    }
+
+    .paper {
+      width: min(1100px, 100%);
+      min-height: 30vh;
+      margin: 0 auto;
+      background: #fff;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      padding: 2rem 2.25rem;
+    }
+
+    .procedure-title {
+      font-family: var(--code-font);
+      font-style: italic;
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+      white-space: pre-wrap;
+    }
+
+    .procedure-title .title-name {
+      text-transform: uppercase;
+      letter-spacing: 0.01em;
+    }
+
+    .code-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .code-table td {
+      vertical-align: top;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .ln {
+      width: var(--gutter-width);
+      text-align: right;
+      color: #222;
+      user-select: none;
+      white-space: pre;
+      font-family: var(--code-font);
+      font-style: italic;
+      font-size: var(--code-size);
+      line-height: var(--line-height);
+    }
+
+    .code {
+      padding-left: var(--gutter-gap);
+      font-family: var(--code-font);
+      font-style: italic;
+      font-size: var(--code-size);
+      line-height: var(--line-height);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .kw {
+      font-style: normal;
+      font-weight: 700;
+    }
+
+    .comment-marker {
+      font-style: normal;
+      font-weight: 700;
+      display: inline-block;
+      margin-right: 0.35ch;
+    }
+
+    .muted-line {
+      color: var(--muted);
+    }
+
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      min-height: 1.2rem;
+    }
+
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 0.05rem 0.35rem;
+      background: #fafafa;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .sidebar {
+        display: none !important;
+      }
+
+      .app {
+        display: block;
+      }
+
+      .workspace {
+        padding: 0;
+      }
+
+      .paper {
+        box-shadow: none;
+        border-radius: 0;
+        width: 100%;
+        min-height: auto;
+        padding: 1.4cm 1.6cm;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>PseudoCode Editor</h1>
+
+      <div class="group">
+        <h2>Editor</h2>
+        <label for="codeInput">Pseudo-code source</label>
+        <textarea id="codeInput" spellcheck="false">for j <- 2 to length[A]
+    do key <- A[j]
+    ▷ Insert A[j] into the sorted sequence A[1..j-1].
+    i <- j - 1
+    while i > 0 and A[i] > key
+        do A[i + 1] <- A[i]
+        i <- i - 1
+    A[i + 1] <- key</textarea>
+
+        <div class="hint">
+          One logical line per editor line. No wrapping; scroll horizontally and vertically as needed.
+        </div>
+      </div>
+
+      <div class="settings-strip">
+        <div class="group">
+          <h2>Settings</h2>
+          <div class="row">
+            <div style="max-width: 50ch; margin-bottom: 1rem;">
+              <label for="procName">Procedure name</label>
+              <input id="procName" type="text" value="INSERTION-SORT(A)" />
+            </div>
+
+          </div>
+          <div class="settings-group">
+
+            <div class="row">
+              <div>
+                <label for="startLine">Start line number</label>
+                <input id="startLine" type="number" min="1" step="1" value="1" />
+              </div>
+              <div>
+                <label for="indentSize">Indent width (spaces)</label>
+                <input id="indentSize" type="number" min="1" step="1" value="4" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label for="fontSize">Font size (px)</label>
+                <input id="fontSize" type="number" min="12" step="1" value="22" />
+              </div>
+              <div>
+                <label for="lineHeight">Line height</label>
+                <input id="lineHeight" type="number" min="1" step="0.05" value="1.5" />
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <label class="checkbox">
+              <input id="autoKeywords" type="checkbox" checked />
+              <span>Auto-bold keywords</span>
+            </label>
+
+            <label class="checkbox">
+              <input id="autoLigatures" type="checkbox" checked />
+              <span>Auto-replace ligatures / operators</span>
+            </label>
+
+            <label class="checkbox">
+              <input id="autoSubscripts" type="checkbox" checked />
+              <span>Auto-subscript trailing digits after letters</span>
+            </label>
+
+            <div class="hint">
+              Keywords: while, for, do, to, downto, then, else, return, and, or
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="group">
+        <h2>Actions</h2>
+        <button class="primary" id="renderBtn">Render</button>
+        <button id="printBtn">Print / Save PDF</button>
+        <button id="downloadHtmlBtn">Download HTML</button>
+        <button id="copyHtmlBtn">Copy HTML</button>
+        <div class="status" id="status"></div>
+      </div>
+
+      <div class="group">
+        <h2>Shortcuts</h2>
+        <div class="hint">
+          <span class="kbd">Ctrl/Cmd + Enter</span> render<br />
+          <span class="kbd">Ctrl/Cmd + P</span> print
+        </div>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div class="paper" id="paper">
+        <div class="procedure-title"><span class="title-name" id="titleName">INSERTION-SORT(A)</span></div>
+        <table class="code-table" id="codeTable"></table>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const KEYWORDS = new Set(["while", "for", "do", "to", "downto", "then", "else", "return", "and", "or"]);
+
+    const els = {
+      procName: document.getElementById("procName"),
+      codeInput: document.getElementById("codeInput"),
+      startLine: document.getElementById("startLine"),
+      indentSize: document.getElementById("indentSize"),
+      fontSize: document.getElementById("fontSize"),
+      lineHeight: document.getElementById("lineHeight"),
+      autoKeywords: document.getElementById("autoKeywords"),
+      autoLigatures: document.getElementById("autoLigatures"),
+      autoSubscripts: document.getElementById("autoSubscripts"),
+      renderBtn: document.getElementById("renderBtn"),
+      printBtn: document.getElementById("printBtn"),
+      downloadHtmlBtn: document.getElementById("downloadHtmlBtn"),
+      copyHtmlBtn: document.getElementById("copyHtmlBtn"),
+      codeTable: document.getElementById("codeTable"),
+      titleName: document.getElementById("titleName"),
+      status: document.getElementById("status"),
+      paper: document.getElementById("paper")
+    };
+
+    function escapeHtml(s) {
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function setStatus(msg) {
+      els.status.textContent = msg;
+    }
+
+    function applyLigatures(text) {
+      return text
+        .replace(/<-/g, "←")
+        .replace(/<=/g, "≤")
+        .replace(/>=/g, "≥")
+        .replace(/!=/g, "≠");
+    }
+
+    function normalizeCommentLine(raw) {
+      const trimmed = raw.trimStart();
+      if (trimmed.startsWith("▷")) {
+        return { isComment: true, content: trimmed.slice(1).trimStart() };
+      }
+      if (trimmed.startsWith("//")) {
+        return { isComment: true, content: trimmed.slice(2).trimStart() };
+      }
+      if (trimmed.startsWith(">")) {
+        return { isComment: true, content: trimmed.slice(1).trimStart() };
+      }
+      return { isComment: false, content: raw };
+    }
+
+    function splitPreserveWhitespace(s) {
+      return s.match(/(\s+|[^\s]+)/g) || [];
+    }
+
+    function formatToken(token, autoKeywords, autoSubscripts) {
+      if (/^\s+$/.test(token)) {
+        return token;
+      }
+
+      let out = escapeHtml(token);
+
+      if (autoSubscripts) {
+        out = out.replace(/([A-Za-z\u00C0-\u024F\u0370-\u03FF])(\d+)\b/g, (_, a, b) => {
+          return `${a}<sub>${b}</sub>`;
+        });
+      }
+
+      const lower = token.toLowerCase();
+      if (autoKeywords && KEYWORDS.has(lower)) {
+        return `<span class="kw">${out}</span>`;
+      }
+
+      return out;
+    }
+
+    function formatCodeText(text, autoKeywords, autoLigatures, autoSubscripts) {
+      const source = autoLigatures ? applyLigatures(text) : text;
+      const tokens = splitPreserveWhitespace(source);
+      return tokens.map(t => formatToken(t, autoKeywords, autoSubscripts)).join("");
+    }
+
+    function countIndentSpaces(raw) {
+      let count = 0;
+      for (const ch of raw) {
+        if (ch === " ") count++;
+        else if (ch === "\t") count += 4;
+        else break;
+      }
+      return count;
+    }
+
+    function render() {
+      const name = (els.procName.value || "PROCEDURE").trim().toUpperCase();
+      const lines = els.codeInput.value.replace(/\r\n/g, "\n").split("\n");
+      const startLine = Math.max(1, parseInt(els.startLine.value || "1", 10));
+      const indentSize = Math.max(1, parseInt(els.indentSize.value || "4", 10));
+      const fontSize = Math.max(12, parseInt(els.fontSize.value || "22", 10));
+      const lineHeight = Math.max(1, parseFloat(els.lineHeight.value || "1.5"));
+      const autoKeywords = els.autoKeywords.checked;
+      const autoLigatures = els.autoLigatures.checked;
+      const autoSubscripts = els.autoSubscripts.checked;
+
+      document.documentElement.style.setProperty("--indent-width", `${indentSize}ch`);
+      document.documentElement.style.setProperty("--code-size", `${fontSize}px`);
+      document.documentElement.style.setProperty("--line-height", String(lineHeight));
+
+      els.titleName.textContent = name;
+      els.codeTable.innerHTML = "";
+
+      lines.forEach((rawLine, idx) => {
+        const tr = document.createElement("tr");
+
+        const tdLn = document.createElement("td");
+        tdLn.className = "ln";
+        tdLn.textContent = String(startLine + idx);
+
+        const tdCode = document.createElement("td");
+        tdCode.className = "code";
+
+        const leadingSpaces = countIndentSpaces(rawLine);
+        const indentUnits = Math.floor(leadingSpaces / indentSize);
+        const rest = rawLine.slice(leadingSpaces);
+
+        const indentSpan = `<span>${" ".repeat(indentUnits * indentSize)}</span>`;
+        const commentInfo = normalizeCommentLine(rest);
+
+        if (commentInfo.isComment) {
+          const commentHtml = formatCodeText(commentInfo.content, false, autoLigatures, autoSubscripts);
+          tdCode.innerHTML = `${indentSpan}<span class="comment-marker">▷</span><span class="muted-line">${commentHtml}</span>`;
+        } else {
+          tdCode.innerHTML = indentSpan + formatCodeText(rest, autoKeywords, autoLigatures, autoSubscripts);
+        }
+
+        tr.appendChild(tdLn);
+        tr.appendChild(tdCode);
+        els.codeTable.appendChild(tr);
+      });
+
+      setStatus(`Rendered ${lines.length} line${lines.length === 1 ? "" : "s"}.`);
+    }
+
+    function buildStandaloneHtml() {
+      const cloneDoc = document.documentElement.cloneNode(true);
+      const scriptNodes = cloneDoc.querySelectorAll("script");
+      scriptNodes.forEach(n => n.remove());
+
+      const sidebar = cloneDoc.querySelector(".sidebar");
+      if (sidebar) sidebar.remove();
+
+      const app = cloneDoc.querySelector(".app");
+      if (app) {
+        app.style.display = "block";
+      }
+
+      return "<!doctype html>\n" + cloneDoc.outerHTML;
+    }
+
+    function downloadHtml() {
+      const blob = new Blob([buildStandaloneHtml()], { type: "text/html;charset=utf-8" });
+      const a = document.createElement("a");
+      const safeName = (els.procName.value || "pseudocode")
+        .trim()
+        .replace(/[^\w\-]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "pseudocode";
+      a.href = URL.createObjectURL(blob);
+      a.download = `${safeName}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setStatus("Downloaded standalone HTML.");
+    }
+
+    async function copyHtml() {
+      try {
+        await navigator.clipboard.writeText(buildStandaloneHtml());
+        setStatus("Standalone HTML copied to clipboard.");
+      } catch (e) {
+        setStatus("Clipboard copy failed in this browser.");
+      }
+    }
+
+    els.renderBtn.addEventListener("click", render);
+    els.printBtn.addEventListener("click", () => window.print());
+    els.downloadHtmlBtn.addEventListener("click", downloadHtml);
+    els.copyHtmlBtn.addEventListener("click", copyHtml);
+
+    document.addEventListener("keydown", (e) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key === "Enter") {
+        e.preventDefault();
+        render();
+      }
+      if (mod && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        window.print();
+      }
+    });
+
+    render();
+  </script>
+</body>
+
+</html>

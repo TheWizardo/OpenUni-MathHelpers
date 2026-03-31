@@ -259,7 +259,8 @@
       background: #fafafa;
     }
 
-    sub, sup {
+    sub,
+    sup {
       font-size: calc(var(--code-size) / 1.5);
     }
 
@@ -410,7 +411,7 @@
   </div>
 
   <script>
-    const KEYWORDS = new Set(["elseif", "while", "for", "do", "to", "downto", "then", "else", "return", "and", "or", "error", "until", "repeat"]);
+    const KEYWORDS = new Set(["elseif", "while", "for", "do", "to", "downto", "then", "if", "else", "return", "and", "or", "error", "until", "repeat"]);
 
     const els = {
       procName: document.getElementById("procName"),
@@ -431,6 +432,93 @@
       status: document.getElementById("status"),
       paper: document.getElementById("paper")
     };
+
+    function indentSelectedLines(textarea, indent = "    ") {
+      const value = textarea.value;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const lineEnd = value.indexOf("\n", end);
+      const blockEnd = lineEnd === -1 ? value.length : lineEnd;
+
+      const selectedBlock = value.slice(lineStart, blockEnd);
+      const lines = selectedBlock.split("\n");
+      const indented = lines.map(line => indent + line).join("\n");
+
+      textarea.value =
+        value.slice(0, lineStart) +
+        indented +
+        value.slice(blockEnd);
+
+      const addedPerLine = indent.length;
+      const lineCount = lines.length;
+
+      textarea.selectionStart = start + addedPerLine;
+      textarea.selectionEnd = end + addedPerLine * lineCount;
+    }
+
+    function unindentSelectedLines(textarea, indentSize = 4) {
+      const value = textarea.value;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const lineEnd = value.indexOf("\n", end);
+      const blockEnd = lineEnd === -1 ? value.length : lineEnd;
+
+      const selectedBlock = value.slice(lineStart, blockEnd);
+      const lines = selectedBlock.split("\n");
+
+      let removedBeforeStart = 0;
+      let removedTotal = 0;
+
+      const unindentedLines = lines.map((line, idx) => {
+        let removeCount = 0;
+
+        if (line.startsWith("\t")) {
+          removeCount = 1;
+        } else {
+          const leadingSpaces = (line.match(/^ */) || [""])[0].length;
+          removeCount = Math.min(indentSize, leadingSpaces);
+        }
+
+        if (idx === 0) {
+          const caretOffsetInFirstLine = start - lineStart;
+          removedBeforeStart = Math.min(removeCount, caretOffsetInFirstLine);
+        }
+
+        removedTotal += removeCount;
+        return line.slice(removeCount);
+      });
+
+      textarea.value =
+        value.slice(0, lineStart) +
+        unindentedLines.join("\n") +
+        value.slice(blockEnd);
+
+      textarea.selectionStart = Math.max(lineStart, start - removedBeforeStart);
+      textarea.selectionEnd = Math.max(textarea.selectionStart, end - removedTotal);
+    }
+
+    els.codeInput.addEventListener("keydown", (e) => {
+      const isCtrlIndent = e.ctrlKey && !e.shiftKey && e.key === "]";
+      const isCtrlUnindent = e.ctrlKey && !e.shiftKey && e.key === "[";
+      const isTabIndent = e.key === "Tab" && !e.shiftKey;
+      const isTabUnindent = e.key === "Tab" && e.shiftKey;
+
+      if (isTabIndent || isCtrlIndent) {
+        e.preventDefault();
+        indentSelectedLines(els.codeInput, " ".repeat(parseInt(els.indentSize.value || "4", 10)));
+        return;
+      }
+
+      if (isTabUnindent || isCtrlUnindent) {
+        e.preventDefault();
+        unindentSelectedLines(els.codeInput, parseInt(els.indentSize.value || "4", 10));
+        return;
+      }
+    });
 
     function escapeHtml(s) {
       return s

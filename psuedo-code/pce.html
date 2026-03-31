@@ -118,7 +118,23 @@
       white-space: pre;
       word-wrap: normal;
       overflow-wrap: normal;
+      tab-size: 4;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      line-height: 1.5;
+
+      --indent-cols: 4;
+      --guide-step: calc(var(--indent-cols) * 1ch);
+      --guide-color: rgba(128, 128, 128, 0.22);
+
+      background-color: #ffffff;
+      background-image:
+        repeating-linear-gradient(to right,
+          transparent 0,
+          transparent calc(var(--guide-step) - 1px),
+          var(--guide-color) calc(var(--guide-step) - 1px),
+          var(--guide-color) var(--guide-step));
+      background-position: calc(0.7rem - var(--guide-step)) 0;
+      background-attachment: local;
     }
 
     .row {
@@ -432,6 +448,13 @@
       status: document.getElementById("status"),
       paper: document.getElementById("paper")
     };
+    els.indentSize.addEventListener("input", updateEditorIndentGuides);
+
+    function updateEditorIndentGuides() {
+      const indentSize = Math.max(1, parseInt(els.indentSize.value || "4", 10));
+      els.codeInput.style.setProperty("--indent-cols", indentSize);
+      els.codeInput.style.tabSize = String(indentSize);
+    }
 
     function indentSelectedLines(textarea, indent = "    ") {
       const value = textarea.value;
@@ -660,6 +683,7 @@
     }
 
     function render() {
+      updateEditorIndentGuides();
       const name = (els.procName.value || "PROCEDURE").trim().toUpperCase();
       const lines = els.codeInput.value.replace(/\r\n/g, "\n").split("\n");
       const startLine = Math.max(1, parseInt(els.startLine.value || "1", 10));

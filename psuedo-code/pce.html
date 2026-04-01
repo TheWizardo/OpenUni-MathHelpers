@@ -13,7 +13,7 @@
       --muted: #666666;
       --border: #d0d0d0;
       --accent: #2d5be3;
-      --gutter-width: 4.8rem;
+      --gutter-width: 3rem;
       --code-font: "Cambria Math", Cambria, "Times New Roman", serif;
       --line-height: 1.5;
       --indent-width: 4ch;
@@ -204,7 +204,6 @@
     }
 
     .procedure-title .title-name {
-      text-transform: uppercase;
       letter-spacing: 0.01em;
     }
 
@@ -352,7 +351,7 @@
               </div>
               <div>
                 <label for="indentSize">Indent width (spaces)</label>
-                <input id="indentSize" type="number" min="1" step="1" value="4" />
+                <input id="indentSize" type="number" min="2" max="4" step="1" value="4" />
               </div>
             </div>
 
@@ -448,7 +447,31 @@
       status: document.getElementById("status"),
       paper: document.getElementById("paper")
     };
-    els.indentSize.addEventListener("input", updateEditorIndentGuides);
+    els.indentSize.addEventListener("input", onIndentSizeChange);
+    let previousIndentSize = els.indentSize.valueAsNumber;
+
+    function updateIndentationWidth(previousIndentSize) {
+      const oldIndent = " ".repeat(previousIndentSize);
+      const newIndent = " ".repeat(els.indentSize.valueAsNumber);
+
+      const escapedOldIndent = oldIndent.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`^${escapedOldIndent}`, "gm");
+
+      els.codeInput.value = els.codeInput.value.replace(re, newIndent);
+    }
+
+    function getCurrIndent() {
+      const lines = els.codeInput.value.split("\n");
+      const lastLine = lines[lines.length - 1] ?? "";
+      const match = lastLine.match(/^ */);
+      return match ? match[0] : "";
+    }
+
+    function onIndentSizeChange(ev) {
+      updateEditorIndentGuides();
+      updateIndentationWidth(previousIndentSize);
+      previousIndentSize = els.indentSize.valueAsNumber;
+    }
 
     function updateEditorIndentGuides() {
       const indentSize = Math.max(1, parseInt(els.indentSize.value || "4", 10));
@@ -529,6 +552,7 @@
       const isCtrlUnindent = e.ctrlKey && !e.shiftKey && e.key === "[";
       const isTabIndent = e.key === "Tab" && !e.shiftKey;
       const isTabUnindent = e.key === "Tab" && e.shiftKey;
+      const isEnter = e.key === "Enter" && !e.ctrlKey && !e.shiftKey;
 
       if (isTabIndent || isCtrlIndent) {
         e.preventDefault();
@@ -539,6 +563,13 @@
       if (isTabUnindent || isCtrlUnindent) {
         e.preventDefault();
         unindentSelectedLines(els.codeInput, parseInt(els.indentSize.value || "4", 10));
+        return;
+      }
+      if (isEnter) {
+        const currIndent = getCurrIndent();
+        setTimeout(() => {
+          indentSelectedLines(els.codeInput, currIndent);
+        }, 10);
         return;
       }
     });
@@ -684,7 +715,10 @@
 
     function render() {
       updateEditorIndentGuides();
-      const name = (els.procName.value || "PROCEDURE").trim().toUpperCase();
+      const name = (els.procName.value || "PROCEDURE").trim().replace(
+        /^([^(\s][^(]*?)\s*(\(|$)/,
+        (_, proc, suffix) => proc.toUpperCase() + suffix
+      );
       const lines = els.codeInput.value.replace(/\r\n/g, "\n").split("\n");
       const startLine = Math.max(1, parseInt(els.startLine.value || "1", 10));
       const indentSize = Math.max(1, parseInt(els.indentSize.value || "4", 10));
